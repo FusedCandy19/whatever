@@ -50,7 +50,7 @@ services:
     volumes:
       - certs:/certs:ro
 
-      inference:
+  inference:
     image: ollama/ollama
     restart: unless-stopped
     volumes:
