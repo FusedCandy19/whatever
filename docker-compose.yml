@@ -50,6 +50,14 @@ services:
     volumes:
       - certs:/certs:ro
 
+      inference:
+    image: ollama/ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama    # models stored here
+    ports:
+      - "11434:11434"
+
 volumes:
   pgdata:
   certs:
