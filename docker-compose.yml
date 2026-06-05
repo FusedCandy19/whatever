@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-apiaas}
+      POSTGRES_USER: ${POSTGRES_USER:-apiaas}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-apiaas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-apiaas}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-apiaas}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_refresh_secret_change_in_production}
+      NODE_ENV: ${NODE_ENV:-production}
+      API_PORT: 443
+      CERT_DIR: /certs
+    volumes:
+      - certs:/certs
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://localhost:443}
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    depends_on:
+      - api
+    volumes:
+      - certs:/certs:ro
+
+volumes:
+  pgdata:
+  certs:

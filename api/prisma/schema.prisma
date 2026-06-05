@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum KeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  name            String
+  passwordHash    String
+  role            Role           @default(USER)
+  plan            Plan           @default(FREE)
+  suspended       Boolean        @default(false)
+  customRateLimit Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  apiKeys         ApiKey[]
+  refreshTokens   RefreshToken[]
+  invoices        Invoice[]
+  usageLogs       UsageLog[]
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String
+  permissions String[]
+  rateLimit   Int?
+  expiresAt   DateTime?
+  status      KeyStatus @default(ACTIVE)
+  lastUsed    DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs   UsageLog[]
+
+  @@index([userId])
+}
+
+model UsageLog {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  userId       String
+  model        String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Decimal  @db.Decimal(10, 6)
+  createdAt    DateTime @default(now())
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([apiKeyId, createdAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Model {
+  id               String   @id
+  displayName      String
+  contextWindow    Int
+  inputPricePer1M  Decimal  @db.Decimal(10, 4)
+  outputPricePer1M Decimal  @db.Decimal(10, 4)
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+}
+
+model Invoice {
+  id        String        @id @default(cuid())
+  userId    String
+  amountUsd Decimal       @db.Decimal(10, 2)
+  status    InvoiceStatus @default(PENDING)
+  period    DateTime
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model BrandingConfig {
+  id           Int      @id @default(1)
+  platformName String   @default("APIaaS")
+  accentColor  String   @default("#8b5cf6")
+  logoUrl      String?
+  themePreset  String   @default("dark-violet")
+  updatedAt    DateTime @updatedAt
+}
